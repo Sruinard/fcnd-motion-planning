@@ -40,7 +40,7 @@ For this project, you are provided with two scripts, `motion_planning.py` and `p
 ```sh
 source activate fcnd # if you haven't already sourced your Python environment, do so now.
 python motion_planning.py
-```
+`````
 
 You should see the quad fly a jerky path of waypoints to the northeast for about 10 m then land.  What's going on here? Your first task in this project is to explain what's different about `motion_planning.py` from the `backyard_flyer_solution.py` script, and how the functions provided in `planning_utils.py` work. 
 

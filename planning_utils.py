@@ -3,6 +3,7 @@ from queue import PriorityQueue
 import numpy as np
 
 
+
 def create_grid(data, drone_altitude, safety_distance):
     """
     Returns a grid representation of a 2D configuration space
@@ -41,6 +42,11 @@ def create_grid(data, drone_altitude, safety_distance):
     return grid, int(north_min), int(east_min)
 
 
+def diagonal(array_1, array_2):
+    diagonal_motion = array_1 + array_2
+    diagonal_motion[2] = np.sqrt(diagonal_motion[2])
+    return diagonal_motion
+
 # Assume all actions cost the same.
 class Action(Enum):
     """
@@ -56,6 +62,17 @@ class Action(Enum):
     NORTH = (-1, 0, 1)
     SOUTH = (1, 0, 1)
 
+    SE = (1, 1, np.sqrt(2))
+    NE = (-1, 1, np.sqrt(2))
+    SW = (1, -1, np.sqrt(2))
+    NW = (-1, -1, np.sqrt(2))
+
+    # # DIAGIONAL MOTION
+    # NW = diagonal(NORTH, WEST)
+    # NE = diagonal(NORTH, EAST)
+    # SW = diagonal(SOUTH, WEST)
+    # SE = diagonal(SOUTH, EAST)
+
     @property
     def cost(self):
         return self.value[2]
@@ -63,6 +80,8 @@ class Action(Enum):
     @property
     def delta(self):
         return (self.value[0], self.value[1])
+
+
 
 
 def valid_actions(grid, current_node):
@@ -84,6 +103,17 @@ def valid_actions(grid, current_node):
         valid_actions.remove(Action.WEST)
     if y + 1 > m or grid[x, y + 1] == 1:
         valid_actions.remove(Action.EAST)
+
+    # update valid actions with diagional motion
+    if x - 1 < 0 or y - 1 < 0 or grid[x - 1, y - 1] == 1:
+        valid_actions.remove(Action.NW)
+    if x - 1 < 0 or y + 1 < m or grid[x - 1, y + 1] == 1:
+        valid_actions.remove(Action.NE)
+    if x + 1 > n or y - 1 < 0 or grid[x + 1, y - 1] == 1:
+        valid_actions.remove(Action.SW)
+    if x + 1 > n or y + 1 < 0 or grid[x + 1, y + 1] == 1:
+        valid_actions.remove(Action.SE)
+
 
     return valid_actions
 
@@ -144,3 +174,41 @@ def a_star(grid, h, start, goal):
 def heuristic(position, goal_position):
     return np.linalg.norm(np.array(position) - np.array(goal_position))
 
+class PathPruner:
+
+    def __init__(self, collinearity_epsilon=1e-2):
+        self.collinearity_epsilon = collinearity_epsilon
+
+    def point(self, p):
+        return np.array([p[0], p[1], 1.]).reshape(1, -1)
+
+    def collinearity_check(self, p1, p2, p3):
+        m = np.concatenate((p1, p2, p3), 0)
+        det = np.linalg.det(m)
+        print(det)
+        return abs(det) < self.collinearity_epsilon
+
+
+    def prune_path(self, path):
+        pruned_path = [p for p in path]
+
+        i = 0
+        while i < len(pruned_path) - 2:
+            p1 = self.point(pruned_path[i])
+            p2 = self.point(pruned_path[i + 1])
+            p3 = self.point(pruned_path[i + 2])
+
+            # If the 3 points are in a line remove
+            # the 2nd point.
+            # The 3rd point now becomes and 2nd point
+            # and the check is redone with a new third point
+            # on the next iteration.
+            if self.collinearity_check(p1, p2, p3):
+                # Something subtle here but we can mutate
+                # `pruned_path` freely because the length
+                # of the list is check on every iteration.
+                pruned_path.remove(pruned_path[i + 1])
+            else:
+                i += 1
+
+        return pruned_path
